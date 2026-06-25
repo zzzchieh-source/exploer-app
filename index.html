@@ -1,8 +1,22 @@
 <!DOCTYPE html>
 <html lang="zh-TW"><head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Explorer — 旅遊 App</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Explorer</title>
+
+<!-- PWA iOS 全螢幕設定 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Explorer">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#d8d4cc">
+
+<!-- PWA manifest -->
+<link rel="manifest" href="manifest.json">
+
+<!-- App icon（Safari 主畫面用）-->
+<link rel="apple-touch-icon" href="icon.png">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -482,6 +496,7 @@ textarea.fi{resize:none;height:72px;line-height:1.5;}
       <div class="preset-grid" id="tmSwatches"></div>
       <button class="sbtn" id="tmSave">儲存</button>
       <button class="cbtn" id="tmCancel">取消</button>
+      <button class="dbtn" id="tmDel" style="display:none;">🗑 刪除此旅程</button>
     </div>
   </div>
 
@@ -528,11 +543,49 @@ textarea.fi{resize:none;height:72px;line-height:1.5;}
   <!-- Email modal -->
   <div class="modal-wrap" id="emailModal">
     <div class="modal">
-      <div class="modal-handle"></div><div class="modal-title">連結 Email</div>
-      <div style="font-size:12px;color:#9a9590;margin-bottom:12px;" id="emailSub">貼上確認信 AI 自動解析</div>
-      <textarea class="fi" id="emailText" placeholder="貼上機票、飯店、景點確認信內文..."></textarea>
-      <button class="sbtn" id="emailParse" style="background:linear-gradient(135deg,#3a4048,#1a1e24);">🪄 AI 解析</button>
-      <div class="parse-res" id="parseRes"><div id="parseRows"></div><button class="apply-btn" id="applyEmail">套用到行程</button></div>
+      <div class="modal-handle"></div>
+      <div class="modal-title">連結 Email</div>
+      <div style="font-size:12px;color:#9a9590;margin-bottom:16px;" id="emailSub">自動搜尋並解析確認信</div>
+
+      <!-- 步驟一：自動開啟 Gmail -->
+      <div style="font-size:11px;color:#9a9590;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">步驟一：開啟 Gmail 找確認信</div>
+      <div style="display:flex;gap:6px;margin-bottom:16px;">
+        <a id="gmailFlight" href="#" target="_blank"
+          style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px;border-radius:12px;border:0.5px solid #c8d8e8;background:#eef4fa;font-size:13px;color:#3a5878;text-decoration:none;font-weight:500;">
+          ✈️ 機票確認信
+        </a>
+        <a id="gmailHotel" href="#" target="_blank"
+          style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px;border-radius:12px;border:0.5px solid #d8cca8;background:#faf5e8;font-size:13px;color:#7a6030;text-decoration:none;font-weight:500;">
+          🏨 住宿確認信
+        </a>
+      </div>
+
+      <!-- 步驟二：貼信件連結 -->
+      <div style="font-size:11px;color:#9a9590;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">步驟二：貼上信件網址</div>
+      <div style="background:#f4f1ed;border-radius:12px;padding:10px 14px;margin-bottom:10px;font-size:12px;color:#6a6560;line-height:1.7;">
+        開啟那封確認信後，複製瀏覽器網址列的網址貼到下方
+      </div>
+      <input class="fi" id="emailUrl" type="text" placeholder="https://mail.google.com/mail/u/0/#inbox/...">
+
+      <!-- 或貼內文 -->
+      <div style="display:flex;align-items:center;gap:8px;margin:10px 0;">
+        <div style="flex:1;height:0.5px;background:#e0dbd4;"></div>
+        <span style="font-size:11px;color:#b0aba4;">或直接貼信件內文</span>
+        <div style="flex:1;height:0.5px;background:#e0dbd4;"></div>
+      </div>
+      <textarea class="fi" id="emailText" placeholder="也可以直接貼上確認信的全文..." style="height:90px;"></textarea>
+
+      <!-- 步驟三 -->
+      <button class="sbtn" id="emailParse" style="background:linear-gradient(135deg,#3a4048,#1a1e24);margin-top:12px;">
+        🪄 AI 解析，自動寫入備注
+      </button>
+
+      <!-- 解析結果 -->
+      <div class="parse-res" id="parseRes">
+        <div style="font-size:11px;color:#4a7a5a;font-weight:500;margin-bottom:8px;">✅ 解析完成</div>
+        <div id="parseRows"></div>
+        <button class="apply-btn" id="applyEmail">寫入備注 &amp; 連結信件</button>
+      </div>
       <button class="cbtn" id="emailCancel">取消</button>
     </div>
   </div>
@@ -810,6 +863,8 @@ function openTripModal(id){
   document.getElementById('tmEnd').value=t?t.end:'';
   document.getElementById('tmPeople').value=t?t.people:'3人';
   document.getElementById('tmBudget').value=t?t.budget:'';
+  // 刪除按鈕只有編輯時才顯示
+  document.getElementById('tmDel').style.display=t?'block':'none';
   tmSelA=t?t.gA:PRESETS[0].a; tmSelB=t?t.gB:PRESETS[0].b;
   buildTmSwatches();
   openModal('tripModal');
@@ -852,6 +907,15 @@ document.getElementById('tmSave').onclick=function(){
   closeModal('tripModal'); renderHome();
 };
 document.getElementById('tmCancel').onclick=()=>closeModal('tripModal');
+document.getElementById('tmDel').onclick=function(){
+  if(!tmEditId)return;
+  if(!confirm('確定要刪除這個旅程嗎？所有行程、費用、相片資料都會一併刪除。'))return;
+  trips=trips.filter(t=>t.id!==tmEditId);
+  // 如果刪的是目前時鐘顯示的旅程，切回第一個
+  if(clockTrip?.id===tmEditId) clockTrip=trips[0]||null;
+  closeModal('tripModal');
+  renderHome();
+};
 
 // ══════════════════════════════════════
 // SCHEDULE
@@ -892,11 +956,13 @@ function buildSchedFeed(){
     const t=TI[item.type]||TI.other;
     const card=document.createElement('div');
     card.className='item-card'+(item.pending?' pending':'');
-    const noteHtml=`<div class="ic-note${item.note?'':' empty'}" data-nid="${item.id}">${item.note||(item.pending?'點「連結 Email」自動填入，或點此輸入…':'點此新增備注…')}</div>`;
+    const noteContent=item.note||(item.pending?'點「連結 Email」自動填入，或點此輸入…':'點此新增備注…');
+    const gmailLink=item.gmailUrl?`<a href="${item.gmailUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#5a88b8;text-decoration:none;margin-top:5px;padding:4px 8px;background:#eef4fa;border-radius:8px;border:0.5px solid #c8d8e8;">📨 查看原始信件</a>`:'';
+    const noteHtml=`<div class="ic-note${item.note?'':' empty'}" data-nid="${item.id}">${noteContent}</div>${gmailLink}`;
     const amtHtml=item.amt>0?`<div class="ic-amt">${SYM[item.cur]||''}${item.amt.toLocaleString()}</div>`:'';
     card.innerHTML=`<div class="ic-row"><div class="ic-bar ${t.tb}"></div><div class="ic-body">
       <div class="ic-top">
-        <div class="ic-title${item.pending?' pt':''}">${item.pending?'等待連結信箱…':item.title}</div>
+        <div class="ic-title${item.pending?' pt':''}" data-edit="${item.id}" style="cursor:pointer;">${item.pending?'等待連結信箱…':item.title}</div>
         <div class="ic-time${item.time?'':' empty'}" data-tid="${item.id}">${item.time||'+ 時間'}</div>
       </div>
       <div class="ic-tag ${t.tg}">${t.l}</div>
@@ -913,13 +979,17 @@ function buildSchedFeed(){
   ab.onclick=()=>openSchedModal(null);
   feed.appendChild(ab);
 
-  // bindings
+  // 點標題 → 開啟編輯表單（含刪除按鈕）
+  feed.querySelectorAll('[data-edit]').forEach(el=>el.onclick=function(e){
+    e.stopPropagation();
+    openSchedModal(parseInt(this.dataset.edit));
+  });
   feed.querySelectorAll('[data-nid]').forEach(el=>el.onclick=function(e){e.stopPropagation();noteTargetId=parseInt(this.dataset.nid);const it=findSchedItem(noteTargetId);document.getElementById('noteText').value=it?.note||'';openModal('noteModal');});
   feed.querySelectorAll('[data-tid]').forEach(el=>el.onclick=function(e){e.stopPropagation();timeTargetId=parseInt(this.dataset.tid);const it=findSchedItem(timeTargetId);document.getElementById('timeInp').value=it?.time||'';openModal('timeModal');});
   feed.querySelectorAll('[data-action]').forEach(pill=>pill.onclick=function(e){
     e.stopPropagation();
     const action=this.dataset.action,id=parseInt(this.dataset.id);
-    if(action==='email'){emailTargetId=id;const it=findSchedItem(id);document.getElementById('emailSub').textContent=`為「${it?.pending?TI[it.type]?.l||'':it?.title||''}」連結確認信`;document.getElementById('emailText').value='';document.getElementById('parseRes').style.display='none';openModal('emailModal');}
+    if(action==='email'){ openEmailFlow(id); }
     else if(action==='map'){window.open(`https://maps.google.com/?q=${encodeURIComponent(this.dataset.addr||'')}`);}
     else{phTrip=schedTrip;phDay=schedTrip.days[schedDay];switchMainTab(3);setTimeout(()=>renderPhGallery(),100);}
   });
@@ -979,24 +1049,103 @@ document.getElementById('timeCancel').onclick=()=>closeModal('timeModal');
 
 // email modal
 document.getElementById('emailCancel').onclick=()=>closeModal('emailModal');
+
+// email modal
+document.getElementById('emailCancel').onclick=()=>closeModal('emailModal');
+
+function openEmailFlow(id){
+  emailTargetId=id;
+  const it=findSchedItem(id);
+  const dest=schedTrip?.region||schedTrip?.country||'';
+  const flightQ=encodeURIComponent('機票 OR flight OR confirmation OR 訂位 '+dest);
+  const hotelQ=encodeURIComponent('飯店 OR hotel OR booking OR 住宿 '+dest);
+  document.getElementById('gmailFlight').href=`https://mail.google.com/mail/#search/${flightQ}`;
+  document.getElementById('gmailHotel').href=`https://mail.google.com/mail/#search/${hotelQ}`;
+  document.getElementById('emailSub').textContent=`為「${it?.title||'行程項目'}」連結確認信`;
+  document.getElementById('emailUrl').value='';
+  document.getElementById('emailText').value='';
+  document.getElementById('parseRes').style.display='none';
+  openModal('emailModal');
+}
+
 document.getElementById('emailParse').onclick=async function(){
-  const text=document.getElementById('emailText').value.trim(); if(!text){alert('請貼上 Email 內文');return;}
+  const url=document.getElementById('emailUrl').value.trim();
+  const text=document.getElementById('emailText').value.trim();
+  if(!url&&!text){alert('請貼上 Gmail 信件網址，或直接貼上信件內文');return;}
   this.textContent='🔍 解析中...'; this.disabled=true;
+  document.getElementById('parseRes').style.display='none';
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,system:'從旅遊確認信提取資訊，只回傳JSON：{"title":"","time":"","orderNo":"","address":"","amount":0,"currency":"TWD","note":""}',messages:[{role:'user',content:text}]})});
+    // 組合給 AI 的內容
+    const content=url
+      ? `這是一封 Gmail 確認信的網址：${url}\n\n${text?'以下是信件部分內容：\n'+text:''}\n\n請根據網址和內容，解析旅遊訂單資訊。`
+      : text;
+
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:800,
+        system:`你是旅遊訂單解析專家。從確認信內容提取關鍵資訊，只回傳純 JSON：
+{
+  "title": "行程標題（簡短，例：仁川機場入境、首爾喜來登 Check-in）",
+  "time": "時間 HH:MM，若無則空字串",
+  "date": "日期 YYYY-MM-DD，若無則空字串",
+  "orderNo": "訂單號或確認碼",
+  "address": "地址或機場名稱",
+  "amount": 金額數字或0,
+  "currency": "TWD或KRW或JPY或USD或EUR或THB",
+  "note": "重要備注（航班號、房型、注意事項，一行內）",
+  "type": "flight或hotel或attraction或transport或other"
+}`,
+        messages:[{role:'user',content}]
+      })
+    });
     const data=await res.json();
-    const parsed=JSON.parse((data.content?.[0]?.text||'{}').replace(/```json|```/g,'').trim());
-    document.getElementById('parseRows').innerHTML=[['標題',parsed.title],['時間',parsed.time],['訂單',parsed.orderNo],['地址',parsed.address],['金額',parsed.amount>0?`${parsed.currency} ${parsed.amount.toLocaleString()}`:''],['備注',parsed.note]].filter(r=>r[1]).map(r=>`<div class="prow"><div class="pk">${r[0]}</div><div class="pv">${r[1]}</div></div>`).join('');
+    const raw=(data.content?.[0]?.text||'{}').replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(raw);
+    // 存入 dataset 含原始 URL
+    parsed._url=url||'';
+    const rows=[
+      ['類型',{flight:'✈️ 機票',hotel:'🏨 住宿',attraction:'🌿 景點',transport:'🚌 交通',other:'📌 其他'}[parsed.type]||parsed.type],
+      ['標題',parsed.title],
+      ['日期',parsed.date],
+      ['時間',parsed.time],
+      ['訂單號',parsed.orderNo],
+      ['地址',parsed.address],
+      ['金額',parsed.amount>0?`${parsed.currency} ${Number(parsed.amount).toLocaleString()}`:''],
+      ['備注',parsed.note],
+    ].filter(r=>r[1]);
+    document.getElementById('parseRows').innerHTML=rows.map(r=>`
+      <div class="prow"><div class="pk">${r[0]}</div><div class="pv">${r[1]}</div></div>`).join('');
     document.getElementById('parseRes').style.display='block';
     document.getElementById('parseRes').dataset.p=JSON.stringify(parsed);
-  }catch(e){alert('解析失敗');}
-  this.textContent='🪄 AI 解析'; this.disabled=false;
+  }catch(e){
+    alert('解析失敗，請確認已貼上網址或信件內文');
+  }
+  this.textContent='🪄 AI 解析，自動寫入備注'; this.disabled=false;
 };
+
 document.getElementById('applyEmail').onclick=function(){
   const parsed=JSON.parse(document.getElementById('parseRes').dataset.p||'{}');
   const it=findSchedItem(emailTargetId);
-  if(it){if(parsed.title)it.title=parsed.title;if(parsed.time)it.time=parsed.time;if(parsed.amount>0){it.amt=parsed.amount;it.cur=parsed.currency||it.cur;}it.note=[parsed.orderNo,parsed.note].filter(Boolean).join(' · ')||it.note;if(parsed.address)it.addr=parsed.address;it.linked=true;it.pending=false;}
-  closeModal('emailModal'); buildSchedFeed();
+  if(it){
+    if(parsed.title) it.title=parsed.title;
+    if(parsed.time) it.time=parsed.time;
+    if(parsed.amount>0){it.amt=parsed.amount;it.cur=parsed.currency||it.cur;}
+    if(parsed.address) it.addr=parsed.address;
+    if(parsed.type) it.type=parsed.type;
+    // 組合備注：訂單號 + 備注說明
+    const noteParts=[parsed.orderNo,parsed.note].filter(Boolean).join(' · ');
+    it.note=noteParts||it.note;
+    // 儲存 Gmail 原始連結
+    it.gmailUrl=parsed._url||'';
+    it.linked=true;
+    it.pending=false;
+  }
+  closeModal('emailModal');
+  buildSchedTabs();
+  buildSchedFeed();
 };
 
 // ══════════════════════════════════════
